@@ -1,8 +1,12 @@
 //! This module defines the proof generation methods corresponding to the three
 //! types of proofs the zkEVM internally handles.
 
+use std::path::Path;
 use std::sync::{atomic::AtomicBool, Arc};
 
+use plonky2::field::goldilocks_field::GoldilocksField;
+use plonky2::util::serialization::GateSerializer;
+use plonky2::util::serialization::WitnessGeneratorSerializer;
 use plonky2::util::timing::TimingTree;
 use plonky2_evm::{all_stark::AllStark, config::StarkConfig};
 use protocol_decoder::types::TxnProofGenIR;
@@ -35,18 +39,24 @@ impl From<String> for ProofGenError {
     }
 }
 
-/// Generates a transaction proof from some IR data.
+/// Generates a transaction proof from some IR data.cargo
 pub fn generate_txn_proof(
     p_state: &ProverState,
+    preprocessed_tables_path: &Path,
     start_info: TxnProofGenIR,
+    gate_serializer: &dyn GateSerializer<GoldilocksField, 2>,
+    generator_serializer: &dyn WitnessGeneratorSerializer<GoldilocksField, 2>,
     abort_signal: Option<Arc<AtomicBool>>,
 ) -> ProofGenResult<GeneratedTxnProof> {
     let (intern, p_vals) = p_state
         .state
-        .prove_root(
+        .prove_root_light(
+            preprocessed_tables_path,
             &AllStark::default(),
             &StarkConfig::standard_fast_config(),
             start_info.gen_inputs,
+            gate_serializer,
+            generator_serializer,
             &mut TimingTree::default(),
             abort_signal,
         )
